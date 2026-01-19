@@ -1,6 +1,6 @@
-# Pi Web Search
+# Pi Web Access
 
-An extension for [Pi coding agent](https://github.com/badlogic/pi-mono/) that adds web search and content fetching. Uses Perplexity AI for search, extracts readable content from URLs.
+An extension for [Pi coding agent](https://github.com/badlogic/pi-mono/) that gives Pi web capabilities: search via Perplexity AI, fetch and extract content from URLs, and read PDFs.
 
 ```typescript
 web_search({ query: "TypeScript best practices 2025" })
@@ -22,7 +22,7 @@ This extension:
 
 ```bash
 # Clone to extensions directory
-git clone https://github.com/nicobailon/pi-web-search ~/.pi/agent/extensions/web-search
+git clone https://github.com/nicobailon/pi-web-access ~/.pi/agent/extensions/web-search
 cd ~/.pi/agent/extensions/web-search
 npm install
 ```
@@ -78,7 +78,13 @@ fetch_content({ url: "https://example.com/article" })
 
 // Multiple URLs - stores content for retrieval
 fetch_content({ urls: ["url1", "url2", "url3"] })
+
+// PDFs - extracted and saved to ~/Downloads/
+fetch_content({ url: "https://arxiv.org/pdf/1706.03762" })
+// → "PDF extracted and saved to: ~/Downloads/arxiv-170603762.md"
 ```
+
+**PDF handling:** When fetching a PDF URL, the extension extracts text and saves it as a markdown file in `~/Downloads/`. The agent can then use `read` to access specific sections without loading 200K+ chars into context.
 
 ### get_search_content
 
@@ -140,9 +146,14 @@ Agent Request → Perplexity API → Synthesized Answer + Citations
                                          ↓
                               Background Fetch (3 concurrent)
                                          ↓
-                              Readability → Markdown
-                                    ↓ (fallback)
-                              RSC Parser → Markdown
+                        ┌────────────────┼────────────────┐
+                        ↓                ↓                ↓
+                       PDF          HTML/Text          RSC
+                        ↓                ↓                ↓
+                   unpdf →        Readability →    RSC Parser →
+                 Save to file      Markdown          Markdown
+                        ↓                ↓                ↓
+                        └────────────────┼────────────────┘
                                          ↓
                               Agent Notification (triggerTurn)
 ```
@@ -159,7 +170,8 @@ Agent Request → Perplexity API → Synthesized Answer + Citations
 |------|---------|
 | `index.ts` | Extension entry, tool definitions, commands, widget |
 | `perplexity.ts` | Perplexity API client, rate limiting |
-| `extract.ts` | URL fetching, content extraction |
+| `extract.ts` | URL fetching, content extraction routing |
+| `pdf-extract.ts` | PDF text extraction, saves to markdown |
 | `rsc-extract.ts` | RSC flight data parser for Next.js pages |
 | `storage.ts` | Session-aware result storage |
 | `activity.ts` | Activity tracking for observability widget |
@@ -168,6 +180,7 @@ Agent Request → Perplexity API → Synthesized Answer + Citations
 
 - Content extraction works best on article-style pages
 - Heavy JS sites may not extract well (no browser rendering), though Next.js App Router pages with RSC flight data are supported
-- Binary files (images, PDFs, etc.) are rejected
-- Max response size: 5MB, max content length: 10,000 chars per URL (truncated)
+- PDFs are extracted as text (no OCR for scanned documents)
+- Max response size: 20MB for PDFs, 5MB for HTML
+- Max content length: 10,000 chars per URL for HTML (truncated), full text for PDFs (saved to file)
 - Requires Pi restart after config file changes
