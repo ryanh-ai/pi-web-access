@@ -2,11 +2,15 @@
   "name": "pi-web-access",
   "version": "0.4.0",
   "type": "module",
+  "keywords": ["pi-package"],
   "dependencies": {
     "@mozilla/readability": "^0.5.0",
     "linkedom": "^0.16.0",
     "p-limit": "^6.1.0",
     "turndown": "^7.2.0",
     "unpdf": "^1.4.0"
+  },
+  "pi": {
+    "extensions": ["./index.ts"]
   }
 }
