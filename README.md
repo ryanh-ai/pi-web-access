@@ -6,6 +6,8 @@
 
 An extension for [Pi coding agent](https://github.com/badlogic/pi-mono/) that gives Pi web capabilities: search via Perplexity AI or Gemini, fetch and extract content from URLs, clone GitHub repos for local exploration, read PDFs, understand YouTube videos, and analyze local video files.
 
+https://github.com/user-attachments/assets/cac6a17a-1eeb-4dde-9818-cdf85d8ea98f
+
 ```typescript
 web_search({ query: "TypeScript best practices 2025" })
 fetch_content({ url: "https://docs.example.com/guide" })
@@ -17,19 +19,19 @@ fetch_content({ url: "https://docs.example.com/guide" })
 pi install npm:pi-web-access
 ```
 
-Configure at least one search provider:
+**Zero config if you're signed into Google in Chrome.** The extension reads your Chrome session cookies to access Gemini — no API keys needed. This gives you web search, YouTube video understanding, page extraction fallbacks, and local video analysis for free.
 
-```bash
-# Option 1: Sign into gemini.google.com in Chrome (free, zero config)
+If you're not signed into Chrome, or want to use a different provider, add API keys to `~/.pi/web-search.json`:
 
-# Option 2: Gemini API key
-echo '{"geminiApiKey": "AIza..."}' > ~/.pi/web-search.json
-
-# Option 3: Perplexity API key
-echo '{"perplexityApiKey": "pplx-..."}' > ~/.pi/web-search.json
+```json
+{ "geminiApiKey": "AIza..." }
 ```
 
-All three work simultaneously. In `auto` mode (default), the extension tries Perplexity first, then Gemini API, then Gemini Web.
+```json
+{ "perplexityApiKey": "pplx-..." }
+```
+
+You can configure both. In `auto` mode (default), the extension tries Perplexity first (if configured), then Gemini API, then Gemini Web via Chrome cookies.
 
 **Requires:** Pi v0.37.3+
 
