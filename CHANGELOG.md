@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.10.1] - 2026-02-18
+## [0.10.2] - 2026-02-18
 
 ### Added
 - **Interactive search curation.** Press Ctrl+Shift+S during or after a multi-query search to open a browser-based review UI. Results stream in live via SSE. Pick which queries to keep, add new searches on the fly, switch providers — then submit to send only the curated results to the agent.
