@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { Box, Key, Text, truncateToWidth } from "@mariozechner/pi-tui";
+import { Box, Text, truncateToWidth } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { StringEnum } from "@mariozechner/pi-ai";
 import { fetchAllContent, type ExtractedContent } from "./extract.js";
@@ -45,6 +45,10 @@ interface WebSearchConfig {
 		model?: string;
 		prompt?: string;
 	};
+	shortcuts?: {
+		curate?: string;
+		activity?: string;
+	};
 }
 
 function loadConfig(): WebSearchConfig {
@@ -67,6 +71,12 @@ function saveConfig(updates: Partial<WebSearchConfig>): void {
 		if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 		writeFileSync(WEB_SEARCH_CONFIG_PATH, JSON.stringify(config, null, 2) + "\n");
 	} catch {}
+}
+
+const DEFAULT_SHORTCUTS = { curate: "ctrl+shift+s", activity: "ctrl+shift+w" };
+
+function formatShortcut(key: string): string {
+	return key.split("+").map(p => p[0].toUpperCase() + p.slice(1)).join("+");
 }
 
 function resolveProvider(
@@ -255,6 +265,11 @@ function handleSessionChange(ctx: ExtensionContext): void {
 }
 
 export default function (pi: ExtensionAPI) {
+	const initConfig = loadConfig();
+	const curateKey = initConfig.shortcuts?.curate || DEFAULT_SHORTCUTS.curate;
+	const activityKey = initConfig.shortcuts?.activity || DEFAULT_SHORTCUTS.activity;
+	const curateLabel = formatShortcut(curateKey);
+
 	function startBackgroundFetch(urls: string[]): string | null {
 		if (urls.length === 0) return null;
 		const fetchId = generateId();
@@ -507,7 +522,7 @@ export default function (pi: ExtensionAPI) {
 		}
 	}
 
-	pi.registerShortcut(Key.ctrl("s"), {
+	pi.registerShortcut(curateKey as any, {
 		description: "Review search results in browser",
 		handler: async (ctx) => {
 			if (!pendingCurate) return;
@@ -525,7 +540,7 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
-	pi.registerShortcut(Key.ctrlShift("w"), {
+	pi.registerShortcut(activityKey as any, {
 		description: "Toggle web search activity",
 		handler: async (ctx) => {
 			widgetVisible = !widgetVisible;
@@ -562,7 +577,7 @@ export default function (pi: ExtensionAPI) {
 		name: "web_search",
 		label: "Web Search",
 		description:
-			"Search the web using Perplexity AI or Gemini. Returns an AI-synthesized answer with source citations. For comprehensive research, prefer queries (plural) with 2-4 varied angles over a single query — each query gets its own synthesized answer, so varying phrasing and scope gives much broader coverage. When includeContent is true, full page content is fetched in the background. Multi-query searches include a brief review window where the user can press Ctrl+S to curate results in the browser before they're sent. Set curate to false to skip this. Provider auto-selects: Perplexity if configured, else Gemini API (needs key), else Gemini Web (needs Chrome login).",
+			`Search the web using Perplexity AI or Gemini. Returns an AI-synthesized answer with source citations. For comprehensive research, prefer queries (plural) with 2-4 varied angles over a single query — each query gets its own synthesized answer, so varying phrasing and scope gives much broader coverage. When includeContent is true, full page content is fetched in the background. Multi-query searches include a brief review window where the user can press ${curateLabel} to curate results in the browser before they're sent. Set curate to false to skip this. Provider auto-selects: Perplexity if configured, else Gemini API (needs key), else Gemini Web (needs Chrome login).`,
 		parameters: Type.Object({
 			query: Type.Optional(Type.String({ description: "Single search query. For research tasks, prefer 'queries' with multiple varied angles instead." })),
 			queries: Type.Optional(Type.Array(Type.String(), { description: "Multiple queries searched in sequence, each returning its own synthesized answer. Prefer this for research — vary phrasing, scope, and angle across 2-4 queries to maximize coverage. Good: ['React vs Vue performance benchmarks 2026', 'React vs Vue developer experience comparison', 'React ecosystem size vs Vue ecosystem']. Bad: ['React vs Vue', 'React vs Vue comparison', 'React vs Vue review'] (too similar, redundant results)." })),
@@ -576,7 +591,7 @@ export default function (pi: ExtensionAPI) {
 				StringEnum(["auto", "perplexity", "gemini"], { description: "Search provider (default: auto)" }),
 			),
 			curate: Type.Optional(Type.Boolean({
-				description: "Hold results for review after searching. The user can press Ctrl+S to open an interactive review page in the browser, or wait for the countdown to auto-send all results. Enabled by default for multi-query searches. Set to false to skip the review window.",
+				description: `Hold results for review after searching. The user can press ${curateLabel} to open an interactive review page in the browser, or wait for the countdown to auto-send all results. Enabled by default for multi-query searches. Set to false to skip the review window.`,
 			})),
 			context: Type.Optional(Type.String({
 				description: "Brief description of your current task or goal. Improves auto-filter relevance for multi-query searches.",
@@ -732,11 +747,11 @@ export default function (pi: ExtensionAPI) {
 						const condensed = condenseResult !== undefined && condenseResult !== null;
 						let text: string;
 						if (condensed) {
-							text = `${searchResults.size} searches condensed · Ctrl+S for all · sending in ${remaining}s`;
+							text = `${searchResults.size} searches condensed · ${curateLabel} for all · sending in ${remaining}s`;
 						} else if (condensing) {
-							text = `${searchResults.size} searches (${totalSources} sources) · condensing... · Ctrl+S to review · sending in ${remaining}s`;
+							text = `${searchResults.size} searches (${totalSources} sources) · condensing... · ${curateLabel} to review · sending in ${remaining}s`;
 						} else {
-							text = `${searchResults.size} searches (${totalSources} sources) · Ctrl+S to review · sending in ${remaining}s`;
+							text = `${searchResults.size} searches (${totalSources} sources) · ${curateLabel} to review · sending in ${remaining}s`;
 						}
 						return {
 							content: [{ type: "text", text }],
@@ -893,7 +908,7 @@ export default function (pi: ExtensionAPI) {
 					if (details?.condensed) {
 						return new Text(
 							theme.fg("success", `${count} searches condensed`) +
-							theme.fg("accent", " \u00b7 Ctrl+S for all") +
+							theme.fg("accent", ` \u00b7 ${curateLabel} for all`) +
 							theme.fg("muted", ` \u00b7 sending in ${remaining}s`),
 							0, 0,
 						);
@@ -903,7 +918,7 @@ export default function (pi: ExtensionAPI) {
 					if (details?.condensing) {
 						line += theme.fg("dim", " \u00b7 condensing...");
 					}
-					line += theme.fg("accent", " \u00b7 Ctrl+S to review") +
+					line += theme.fg("accent", ` \u00b7 ${curateLabel} to review`) +
 						theme.fg("muted", ` \u00b7 sending in ${remaining}s`);
 					return new Text(line, 0, 0);
 				}

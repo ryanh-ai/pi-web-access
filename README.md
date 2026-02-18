@@ -93,7 +93,7 @@ web_search({ queries: ["query 1", "query 2"], curate: true })
 | `domainFilter` | Limit to domains (prefix with `-` to exclude) |
 | `provider` | `auto` (default), `perplexity`, or `gemini` |
 | `includeContent` | Fetch full page content from sources in background |
-| `curate` | Hold results for browser review (default: true for multi-query). Press Ctrl+S to open browser UI, or wait for countdown to auto-condense and send. Set to false to skip both curation and condensation. |
+| `curate` | Hold results for browser review (default: true for multi-query). Press Ctrl+Shift+S to open browser UI, or wait for countdown to auto-condense and send. Set to false to skip both curation and condensation. |
 
 ### fetch_content
 
@@ -240,15 +240,34 @@ All config lives in `~/.pi/web-search.json`. Every field is optional.
     "enabled": true,
     "preferredModel": "gemini-3-flash-preview",
     "maxSizeMB": 50
+  },
+  "shortcuts": {
+    "curate": "ctrl+shift+s",
+    "activity": "ctrl+shift+w"
   }
 }
 ```
 
-`GEMINI_API_KEY` and `PERPLEXITY_API_KEY` env vars take precedence over config file values. `provider` sets the default search provider: `"perplexity"` or `"gemini"`. This is also updated automatically when you change the provider in the curator UI. `curateWindow` controls how many seconds multi-query searches wait before auto-sending results (default: 10). During the countdown, press Ctrl+S to open the browser curator. Set to 0 to always send immediately (Ctrl+S still works during the search itself).
+`GEMINI_API_KEY` and `PERPLEXITY_API_KEY` env vars take precedence over config file values. `provider` sets the default search provider: `"perplexity"` or `"gemini"`. This is also updated automatically when you change the provider in the curator UI. `curateWindow` controls how many seconds multi-query searches wait before auto-sending results (default: 10). During the countdown, press Ctrl+Shift+S to open the browser curator. Set to 0 to always send immediately (Ctrl+Shift+S still works during the search itself).
+
+### Shortcuts
+
+Both shortcuts are configurable via `~/.pi/web-search.json`:
+
+```json
+{
+  "shortcuts": {
+    "curate": "ctrl+shift+s",
+    "activity": "ctrl+shift+w"
+  }
+}
+```
+
+Values use the same format as pi keybindings (e.g. `ctrl+s`, `ctrl+shift+s`, `alt+r`). Changes take effect on next pi restart.
 
 ### Auto-Condense
 
-Multi-query searches are automatically condensed into a deduplicated briefing when the countdown expires without Ctrl+S. A single LLM call receives all search results — enriched with preprocessing analysis (URL overlap, answer similarity, source quality tiers) — and produces a concise synthesis organized by topic. Irrelevant or off-topic results are skipped automatically.
+Multi-query searches are automatically condensed into a deduplicated briefing when the countdown expires without manual curation. A single LLM call receives all search results — enriched with preprocessing analysis (URL overlap, answer similarity, source quality tiers) — and produces a concise synthesis organized by topic. Irrelevant or off-topic results are skipped automatically.
 
 ```json
 {
