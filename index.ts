@@ -621,7 +621,8 @@ export default function (pi: ExtensionAPI) {
 
 				const pplxAvail = isPerplexityAvailable();
 				const geminiApiAvail = isGeminiApiAvailable();
-				const geminiWebAvail = await isGeminiWebAvailable();
+				const configProvider = loadConfig().provider;
+				const geminiWebAvail = (configProvider === "perplexity") ? null : await isGeminiWebAvailable();
 				const availableProviders = {
 					perplexity: pplxAvail,
 					gemini: geminiApiAvail || !!geminiWebAvail,
@@ -1443,7 +1444,8 @@ export default function (pi: ExtensionAPI) {
 
 			const pplxAvail = isPerplexityAvailable();
 			const geminiApiAvail = isGeminiApiAvailable();
-			const geminiWebAvail = await isGeminiWebAvailable();
+			const configProvider = loadConfig().provider;
+			const geminiWebAvail = (configProvider === "perplexity") ? null : await isGeminiWebAvailable();
 			const availableProviders = {
 				perplexity: pplxAvail,
 				gemini: geminiApiAvail || !!geminiWebAvail,
