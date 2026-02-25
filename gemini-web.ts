@@ -1,4 +1,9 @@
 import { type CookieMap, getGoogleCookies } from "./chrome-cookies.js";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+const WEB_SEARCH_CONFIG_PATH = join(homedir(), ".pi", "web-search.json");
 
 const GEMINI_APP_URL = "https://gemini.google.com/app";
 const GEMINI_STREAM_GENERATE_URL =
@@ -31,9 +36,29 @@ function hasRequiredCookies(cookieMap: CookieMap): boolean {
 }
 
 export async function isGeminiWebAvailable(): Promise<CookieMap | null> {
+	if (!isGeminiWebCookiesEnabled()) return null;
 	const result = await getGoogleCookies();
 	if (!result || !hasRequiredCookies(result.cookies)) return null;
 	return result.cookies;
+}
+
+let _cookieOptInLogged = false;
+
+function isGeminiWebCookiesEnabled(): boolean {
+	try {
+		if (existsSync(WEB_SEARCH_CONFIG_PATH)) {
+			const config = JSON.parse(readFileSync(WEB_SEARCH_CONFIG_PATH, "utf-8"));
+			const geminiWeb = config.geminiWeb;
+			if (geminiWeb && typeof geminiWeb === "object" && geminiWeb.cookies === true) {
+				if (!_cookieOptInLogged) {
+					_cookieOptInLogged = true;
+					console.error("[pi-web-access] Gemini Web cookies enabled — reading Chrome cookie DB for Google session cookies");
+				}
+				return true;
+			}
+		}
+	} catch {}
+	return false;
 }
 
 export async function queryWithCookies(
