@@ -10,19 +10,29 @@ export type SearchProvider = "auto" | "perplexity" | "gemini";
 
 const CONFIG_PATH = join(homedir(), ".pi", "web-search.json");
 
-let cachedSearchConfig: { searchProvider: SearchProvider } | null = null;
+let cachedSearchConfig: { searchProvider: SearchProvider; searchModel?: string } | null = null;
 
-function getSearchConfig(): { searchProvider: SearchProvider } {
+function getSearchConfig(): { searchProvider: SearchProvider; searchModel?: string } {
 	if (cachedSearchConfig) return cachedSearchConfig;
 	try {
 		if (existsSync(CONFIG_PATH)) {
-			const raw = JSON.parse(readFileSync(CONFIG_PATH, "utf-8"));
-			cachedSearchConfig = { searchProvider: raw.searchProvider ?? "auto" };
+			const raw = JSON.parse(readFileSync(CONFIG_PATH, "utf-8")) as {
+				searchProvider?: SearchProvider;
+				searchModel?: unknown;
+			};
+			cachedSearchConfig = {
+				searchProvider: raw.searchProvider ?? "auto",
+				searchModel: normalizeSearchModel(raw.searchModel),
+			};
 			return cachedSearchConfig;
 		}
 	} catch {}
-	cachedSearchConfig = { searchProvider: "auto" };
+	cachedSearchConfig = { searchProvider: "auto", searchModel: undefined };
 	return cachedSearchConfig;
+}
+
+function normalizeSearchModel(value: unknown): string | undefined {
+	return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 export interface FullSearchOptions extends SearchOptions {
@@ -44,7 +54,7 @@ export async function search(query: string, options: FullSearchOptions = {}): Pr
 		throw new Error(
 			"Gemini search unavailable. Either:\n" +
 			"  1. Set GEMINI_API_KEY in ~/.pi/web-search.json\n" +
-			"  2. Sign into gemini.google.com in Chrome"
+			"  2. Sign into gemini.google.com in a supported Chromium-based browser"
 		);
 	}
 
@@ -60,7 +70,7 @@ export async function search(query: string, options: FullSearchOptions = {}): Pr
 		"No search provider available. Either:\n" +
 		"  1. Set perplexityApiKey in ~/.pi/web-search.json\n" +
 		"  2. Set GEMINI_API_KEY in ~/.pi/web-search.json\n" +
-		"  3. Sign into gemini.google.com in Chrome"
+		"  3. Sign into gemini.google.com in a supported Chromium-based browser"
 	);
 }
 
@@ -71,7 +81,7 @@ async function searchWithGeminiApi(query: string, options: SearchOptions = {}): 
 	const activityId = activityMonitor.logStart({ type: "api", query });
 
 	try {
-		const model = DEFAULT_MODEL;
+		const model = getSearchConfig().searchModel ?? DEFAULT_MODEL;
 		const body = {
 			contents: [{ parts: [{ text: query }] }],
 			tools: [{ google_search: {} }],

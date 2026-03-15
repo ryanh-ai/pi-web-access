@@ -26,7 +26,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { isPerplexityAvailable } from "./perplexity.js";
 import { isGeminiApiAvailable } from "./gemini-api.js";
-import { isGeminiWebAvailable } from "./gemini-web.js";
+import { getActiveGoogleEmail, isGeminiWebAvailable } from "./gemini-web.js";
 import {
 	condenseSearchResults,
 	postProcessCondensed,
@@ -577,7 +577,7 @@ export default function (pi: ExtensionAPI) {
 		name: "web_search",
 		label: "Web Search",
 		description:
-			`Search the web using Perplexity AI or Gemini. Returns an AI-synthesized answer with source citations. For comprehensive research, prefer queries (plural) with 2-4 varied angles over a single query — each query gets its own synthesized answer, so varying phrasing and scope gives much broader coverage. When includeContent is true, full page content is fetched in the background. Multi-query searches include a brief review window where the user can press ${curateLabel} to curate results in the browser before they're sent. Set curate to false to skip this. Provider auto-selects: Perplexity if configured, else Gemini API (needs key), else Gemini Web (needs Chrome login).`,
+			`Search the web using Perplexity AI or Gemini. Returns an AI-synthesized answer with source citations. For comprehensive research, prefer queries (plural) with 2-4 varied angles over a single query — each query gets its own synthesized answer, so varying phrasing and scope gives much broader coverage. When includeContent is true, full page content is fetched in the background. Multi-query searches include a brief review window where the user can press ${curateLabel} to curate results in the browser before they're sent. Set curate to false to skip this. Provider auto-selects: Perplexity if configured, else Gemini API (needs key), else Gemini Web (needs a supported Chromium-based browser login).`,
 		parameters: Type.Object({
 			query: Type.Optional(Type.String({ description: "Single search query. For research tasks, prefer 'queries' with multiple varied angles instead." })),
 			queries: Type.Optional(Type.Array(Type.String(), { description: "Multiple queries searched in sequence, each returning its own synthesized answer. Prefer this for research — vary phrasing, scope, and angle across 2-4 queries to maximize coverage. Good: ['React vs Vue performance benchmarks 2026', 'React vs Vue developer experience comparison', 'React ecosystem size vs Vue ecosystem']. Bad: ['React vs Vue', 'React vs Vue comparison', 'React vs Vue review'] (too similar, redundant results)." })),
@@ -1549,6 +1549,34 @@ export default function (pi: ExtensionAPI) {
 				const message = err instanceof Error ? err.message : String(err);
 				ctx.ui.notify(`Failed to open curator: ${message}`, "error");
 			}
+		},
+	});
+
+	pi.registerCommand("google-account", {
+		description: "Show the active Google account for Gemini Web",
+		handler: async () => {
+			const cookies = await isGeminiWebAvailable();
+			if (!cookies) {
+				pi.sendMessage({
+					customType: "google-account",
+					content: [{ type: "text", text: "Gemini Web is unavailable. Sign into gemini.google.com in a supported Chromium-based browser." }],
+					display: "tool",
+					details: { available: false },
+				}, { triggerTurn: true, deliverAs: "followUp" });
+				return;
+			}
+
+			const email = await getActiveGoogleEmail(cookies);
+			const text = email
+				? `Active Google account: ${email}`
+				: "Gemini Web is available, but the active Google account could not be determined.";
+
+			pi.sendMessage({
+				customType: "google-account",
+				content: [{ type: "text", text }],
+				display: "tool",
+				details: { available: true, email: email ?? null },
+			}, { triggerTurn: true, deliverAs: "followUp" });
 		},
 	});
 

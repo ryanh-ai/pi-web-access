@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.3] - 2026-03-12
+
+### Added
+- `/google-account` command to report the active Google account currently authenticated for Gemini Web.
+- `chromeProfile` config support for targeting a non-default Chromium profile when reading Gemini Web cookies.
+- `searchModel` config support for overriding the Gemini API model used by `web_search`.
+
+### Changed
+- Chromium cookie extraction now tries Helium, Chrome, and Arc on macOS, plus Chromium and Chrome on Linux, with profile-aware cookie paths and per-platform key handling.
+- Gemini Web availability checks now pass required cookie names into cookie extraction and can look up the active signed-in Google account without changing existing `isGeminiWebAvailable()` callers.
+- README documentation now covers macOS/Linux cookie extraction limits, the new config fields, the `/google-account` command, and the expanded `chrome-cookies.ts` role.
+
 ## [0.10.2] - 2026-02-18
 
 ### Added
