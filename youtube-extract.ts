@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -21,9 +22,24 @@ Format as markdown.`;
 const YOUTUBE_REGEX =
 	/(?:(?:www\.|m\.)?youtube\.com\/(?:watch\?.*v=|shorts\/|live\/|embed\/|v\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
 
+function shouldRethrow(err: unknown): boolean {
+	const message = err instanceof Error ? err.message : String(err);
+	return message.startsWith("Failed to parse ");
+}
+
 interface YouTubeConfig {
 	enabled: boolean;
 	preferredModel: string;
+}
+
+function normalizePreferredModel(value: unknown, fallback: string): string {
+	if (typeof value !== "string") return fallback;
+	const normalized = value.trim();
+	return normalized.length > 0 ? normalized : fallback;
+}
+
+function normalizeEnabled(value: unknown, fallback: boolean): boolean {
+	return typeof value === "boolean" ? value : fallback;
 }
 
 const defaults: YouTubeConfig = { enabled: true, preferredModel: "gemini-3-flash-preview" };
@@ -31,18 +47,25 @@ let cachedConfig: YouTubeConfig | null = null;
 
 function loadYouTubeConfig(): YouTubeConfig {
 	if (cachedConfig) return cachedConfig;
+	if (!existsSync(CONFIG_PATH)) {
+		cachedConfig = { ...defaults };
+		return cachedConfig;
+	}
+
+	const rawText = readFileSync(CONFIG_PATH, "utf-8");
+	let raw: { youtube?: { enabled?: boolean; preferredModel?: string } };
 	try {
-		if (existsSync(CONFIG_PATH)) {
-			const raw = JSON.parse(readFileSync(CONFIG_PATH, "utf-8"));
-			const yt = raw.youtube ?? {};
-			cachedConfig = {
-				enabled: yt.enabled ?? defaults.enabled,
-				preferredModel: yt.preferredModel ?? defaults.preferredModel,
-			};
-			return cachedConfig;
-		}
-	} catch {}
-	cachedConfig = { ...defaults };
+		raw = JSON.parse(rawText) as { youtube?: { enabled?: boolean; preferredModel?: string } };
+	} catch (err) {
+		const message = err instanceof Error ? err.message : String(err);
+		throw new Error(`Failed to parse ${CONFIG_PATH}: ${message}`);
+	}
+
+	const yt = raw.youtube ?? {};
+	cachedConfig = {
+		enabled: normalizeEnabled(yt.enabled, defaults.enabled),
+		preferredModel: normalizePreferredModel(yt.preferredModel, defaults.preferredModel),
+	};
 	return cachedConfig;
 }
 
@@ -53,7 +76,6 @@ export function isYouTubeURL(url: string): { isYouTube: boolean; videoId: string
 			return { isYouTube: false, videoId: null };
 		}
 	} catch {
-		return { isYouTube: false, videoId: null };
 	}
 
 	const match = url.match(YOUTUBE_REGEX);
@@ -95,6 +117,11 @@ export async function extractYouTube(
 		return result;
 	}
 
+	if (signal?.aborted) {
+		activityMonitor.logComplete(activityId, 0);
+		return null;
+	}
+
 	activityMonitor.logError(activityId, "all extraction paths failed");
 	return null;
 }
@@ -117,7 +144,6 @@ function mapYtDlpError(err: unknown): string {
 
 export async function getYouTubeStreamInfo(videoId: string): Promise<StreamResult> {
 	try {
-		const { execFileSync } = await import("node:child_process");
 		const output = execFileSync("yt-dlp", [
 			"--print", "duration",
 			"-g", `https://www.youtube.com/watch?v=${videoId}`,
@@ -136,7 +162,6 @@ export async function getYouTubeStreamInfo(videoId: string): Promise<StreamResul
 
 async function extractFrameFromStream(streamUrl: string, seconds: number): Promise<FrameResult> {
 	try {
-		const { execFileSync } = await import("node:child_process");
 		const buffer = execFileSync("ffmpeg", [
 			"-ss", String(seconds), "-i", streamUrl,
 			"-frames:v", "1", "-f", "image2pipe", "-vcodec", "mjpeg", "pipe:1",
@@ -214,7 +239,8 @@ async function tryGeminiWeb(
 			content: text,
 			error: null,
 		};
-	} catch {
+	} catch (err) {
+		if (shouldRethrow(err)) throw err;
 		return null;
 	}
 }
@@ -242,7 +268,8 @@ async function tryGeminiApi(
 			content: text,
 			error: null,
 		};
-	} catch {
+	} catch (err) {
+		if (shouldRethrow(err)) throw err;
 		return null;
 	}
 }
@@ -276,7 +303,8 @@ async function tryPerplexity(
 			content,
 			error: null,
 		};
-	} catch {
+	} catch (err) {
+		if (shouldRethrow(err)) throw err;
 		return null;
 	}
 }
